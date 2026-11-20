@@ -90,7 +90,15 @@ function render(){
  else if(!hasPair()) html+=`<div class="panel"><p>Load both inventories to work on this step.</p><button class="primary" data-step="0">Set up instances</button></div>`;
  else if(key==='review'){
   const data=all();
-  html+=`<div class="metrics">${['Mapped','In description','Unresolved','Skipped','Total'].map(status=>`<div class="metric"><b>${status==='Total'?data.length:data.filter(r=>r.status===status).length}</b>${status}</div>`).join('')}</div><div class="panel table"><h2>Coverage by configuration area</h2><table><thead><tr><th>Configuration</th><th>Mapped</th><th>In description</th><th>Unresolved</th><th>Skipped</th></tr></thead><tbody>${categories.map(([k,l],i)=>`<tr><td><button data-step="${i+1}">${l}</button></td>${['Mapped','In description','Unresolved','Skipped'].map(s=>`<td>${rows(k).filter(r=>r.status===s).length}</td>`).join('')}</tr>`).join('')}</tbody></table><p class="info">Coverage checks apply to the uploaded objects. Review target permissions, dependencies, field contexts, and workflow transitions before applying a migration.</p><button class="primary" data-action="export">Export plan JSON</button></div>`;
+  html+=`<div class="metrics">${['Mapped','In description','Unresolved','Skipped','Total'].map(status=>`<div class="metric"><b>${status==='Total'?data.length:data.filter(r=>r.status===status).length}</b>${status}</div>`).join('')}</div><div class="panel table"><h2>Coverage by configuration area</h2><table><thead><tr><th>Configuration</th><th>Mapped</th><th>In description</th><th>Unresolved</th><th>Skipped</th></tr></thead><tbody>${categories.map(([k,l],i)=>`<tr><td><button data-step="${i+1}">${l}</button></td>${['Mapped','In description','Unresolved','Skipped'].map(s=>`<td>${rows(k).filter(r=>r.status===s).length}</td>`).join('')}</tr>`).join('')}</tbody></table><p class="info">Coverage checks apply to the uploaded objects. Review target permissions, dependencies, field contexts, and workflow transitions before applying a migration.</p><div class="toolbar"><button class="primary" data-action="dry-run" aria-controls="dry-run-panel" aria-expanded="false">Run dry run</button><button data-action="export">Export plan JSON</button></div></div>
+  <section class="panel" id="dry-run-panel" hidden aria-labelledby="dry-run-title"><h2 id="dry-run-title" tabindex="-1">Run a read-only dry run</h2>
+  ${state.source.demo||state.target.demo||state.source.hosting!=='Data Center'||state.target.hosting!=='Data Center'
+   ?'<p>The connector needs real Jira Data Center inventories for both instances. <button data-step="0">Set up instances</button></p>'
+   :`<p>Download the plan and the connector. Run the command from their folder on a machine that can reach the source Jira. Replace the example URL and project key with your own.</p>
+   <div class="toolbar"><button data-action="export">Download migration plan</button><a class="button" href="jira-dc-connector.py" download>Download Data Center connector</a></div>
+   <pre>python3 jira-dc-connector.py preview --url https://jira.example.com --plan jira-migration-plan.json --jql "project = PAY" --limit 10 --output preview.json</pre>
+   <p>Enter your source PAT when prompted. Open <code>preview.json</code> to review mapping gaps and proposed descriptions. The dry run reads source issues only.</p>`}
+  </section>`;
  } else {
   const list=rows(key);
   html+=`<div class="panel"><div class="toolbar"><p>${list.filter(r=>['Mapped','In description'].includes(r.status)).length} assigned of ${list.length} source objects</p><button data-action="match" ${list.length?'':'disabled'}>Match identical names</button></div>${list.length?`<div class="table"><table><thead><tr><th>Source object</th><th>Destination object</th><th>Status</th></tr></thead><tbody>${list.map(({source,target,status},i)=>`<tr><td>${esc(source.name)}<small>${esc(source.kind||source.id)}</small></td><td><select aria-label="Destination for ${esc(source.name)}" data-map="${i}"><option value="">Select destination</option>${key==='fields'?`<option value="description" ${status==='In description'?'selected':''}>Append to issue description</option>`:''}<option value="skip" ${status==='Skipped'?'selected':''}>Skip this object</option>${inventory('target',key).map((item,j)=> compatible(source,item)?`<option value="target-${j}" ${target?.id===item.id?'selected':''}>${esc(item.name)} (${esc(item.id)})</option>`:'').join('')}</select></td><td><span class="pill ${['Mapped','In description'].includes(status)?'ok':''}">${status}</span></td></tr>`).join('')}</tbody></table></div>`:'<p>No source objects were supplied for this area.</p>'}</div>`;
@@ -152,6 +160,12 @@ document.addEventListener('click',event=>{
    const matches=inventory('target',key).filter(item=>compatible(source,item)&&item.name.trim().toLowerCase()===source.name.trim().toLowerCase());
    if(matches.length===1)state.mapping[slot(key,source.id)]=matches[0].id;
   }
+ } else if(action==='dry-run'){
+  const panel=by('dry-run-panel');
+  panel.hidden=!panel.hidden;
+  button.setAttribute('aria-expanded',String(!panel.hidden));
+  if(!panel.hidden)by('dry-run-title').focus();
+  return;
  } else if(action==='export'){
   const endpoints=Object.fromEntries(['source','target'].map(side=>[side,{hosting:state[side].hosting,url:state[side].url,inventory:state[side].filename,sample:Boolean(state[side].demo)}]));
   const mappings=Object.fromEntries(categories.map(([k])=>[k,rows(k).map(row=>({...row,target:row.target??null}))]));
