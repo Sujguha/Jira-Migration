@@ -1,0 +1,9 @@
+.env
+.env.*
+!.env.example
+__pycache__/
+*.pyc
+source.json
+target.json
+preview.json
+jira-migration-plan.json
